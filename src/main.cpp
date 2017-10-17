@@ -1,4 +1,5 @@
 #include <uWS/uWS.h>
+//#include "uWS/uWS.h"
 #include <iostream>
 #include "json.hpp"
 #include <math.h>
@@ -26,17 +27,196 @@ std::string hasData(std::string s) {
   return "";
 }
 
-int main()
+VectorXd createEstimateVector(const VectorXd& x) {
+  double p_x = x(0);
+  double p_y = x(1);
+  double v1  = x(2);
+  double v2 = x(3);
+  
+  VectorXd estimate(4);
+  
+  estimate(0) = p_x;
+  estimate(1) = p_y;
+  estimate(2) = v1;
+  estimate(3) = v2;
+  
+  return estimate;
+}
+
+VectorXd createGroundTruthVector(std::string theSensorMeasurement) {
+  
+  MeasurementPackage measurementPackage;
+  
+  istringstream iss(theSensorMeasurement);
+  
+  // reads first element from the current line
+  string sensorType;
+  iss >> sensorType;
+  
+  if (sensorType.compare("L") == 0) {
+    for (int toss=0; toss<3; toss++) {
+      string measurement;
+      iss >> measurement;
+    }
+    
+  } else if (sensorType.compare("R") == 0) {
+    for (int toss=0; toss<4; toss++) {
+      string measurement;
+      iss >> measurement;
+    }
+  }
+  
+  float x_gt;
+  float y_gt;
+  float vx_gt;
+  float vy_gt;
+  iss >> x_gt;
+  iss >> y_gt;
+  iss >> vx_gt;
+  iss >> vy_gt;
+  VectorXd gt_values(4);
+  gt_values(0) = x_gt;
+  gt_values(1) = y_gt;
+  gt_values(2) = vx_gt;
+  gt_values(3) = vy_gt;
+  
+  return gt_values;
+}
+
+MeasurementPackage createMeasurementPackage(std::string theSensorMeasurement) {
+  
+  MeasurementPackage measurementPackage;
+  
+  istringstream iss(theSensorMeasurement);
+  long long timestamp;
+  
+  // reads first element from the current line
+  string sensorType;
+  iss >> sensorType;
+  
+  if (sensorType.compare("L") == 0) {
+    
+    measurementPackage.sensor_type_ = MeasurementPackage::LASER;
+    measurementPackage.raw_measurements_ = VectorXd(2);
+    float px;
+    float py;
+    iss >> px;
+    iss >> py;
+    measurementPackage.raw_measurements_ << px, py;
+    iss >> timestamp;
+    measurementPackage.timestamp_ = timestamp;
+    
+  } else if (sensorType.compare("R") == 0) {
+    
+    measurementPackage.sensor_type_ = MeasurementPackage::RADAR;
+    measurementPackage.raw_measurements_ = VectorXd(3);
+    float ro;
+    float theta;
+    float ro_dot;
+    iss >> ro;
+    iss >> theta;
+    iss >> ro_dot;
+    measurementPackage.raw_measurements_ << ro,theta, ro_dot;
+    iss >> timestamp;
+    measurementPackage.timestamp_ = timestamp;
+  } else {
+    measurementPackage.sensor_type_ = MeasurementPackage::INVALID;
+  }
+  
+  return measurementPackage;
+}
+
+VectorXd compareRSME(VectorXd thePreviousRSME, VectorXd theCurrentRSME) {
+  assert (thePreviousRSME.size()==theCurrentRSME.size());
+  VectorXd comparison = VectorXd(4);
+  for (int row=0; row<thePreviousRSME.size(); row++) {
+    comparison(row)=theCurrentRSME(row)-thePreviousRSME(row);
+  }
+  return comparison;
+}
+
+int runAsFileProcessor(UKFProcessor theUKFProcessor, std::string theFileName) {
+  
+  ifstream measurementFile;
+  measurementFile.open(theFileName, ios::in);
+  if (Tools::TESTING) cout<<"runAsFileProcessor-theFileName: <"<< theFileName << ">, is_open? " << measurementFile.is_open() << "\n";
+  
+  int noise_ax = 5;
+  int noise_ay = 5;
+  int lineNumber = 0;
+  VectorXd noise = VectorXd(2);
+  VectorXd previousRSME = Eigen::VectorXd(4);
+  previousRSME << 0,0,0,0;
+  noise << noise_ax, noise_ay;
+  if (Tools::TESTING) std::cout << "noise:" <<  noise << std::endl;
+  
+  if (measurementFile.is_open()) {
+    vector<VectorXd> estimates;
+    vector<VectorXd> groundTruthVector;
+    if (Tools::TESTING) cout<<"runAsFileProcessor-theFileName: "<< theFileName << "\n";
+    string measurementLine;
+    while ( getline (measurementFile, measurementLine) ){
+      lineNumber++;
+      if (Tools::TESTING) {
+        cout << "l-------------------------------------------" << "\n"
+        << lineNumber << ": <" << measurementLine << ">\n"
+        << "l-------------------------------------------" << "\n";
+      }
+      MeasurementPackage measurementPackage = createMeasurementPackage(measurementLine);
+      if (    (measurementPackage.sensor_type_ == MeasurementPackage::RADAR && theUKFProcessor.useRadar())
+          ||  (measurementPackage.sensor_type_ == MeasurementPackage::LASER&& theUKFProcessor.useLidar()) ) {
+        theUKFProcessor.ProcessMeasurement(measurementPackage);
+        
+        VectorXd groundTruthValues = createGroundTruthVector(measurementLine);
+        if (Tools::TESTING) cout<<"runAsFileProcessor-groundTruthValues: <"<< Tools::toString(groundTruthValues) << "\n";
+        groundTruthVector.push_back(groundTruthValues);
+        VectorXd estimate = createEstimateVector(theUKFProcessor.x());
+        if (Tools::TESTING) cout<<"runAsFileProcessor-estimate: <"<< Tools::toString(estimate) << "\n";
+        estimates.push_back(estimate);
+        VectorXd rsme = Tools::CalculateRMSE(estimates, groundTruthVector);
+        if (true || Tools::TESTING) cout<<"runAsFileProcessor-rsme: <"<< Tools::toString(rsme) << "\n";
+        if (Tools::TESTING) {
+          cout << "r-------------------------------------------" << "\n"
+          << "<" << Tools::toString(compareRSME(previousRSME, rsme)) << ">\n"
+          << "-r------------------------------------------" << "\n";
+        }
+        previousRSME=rsme;
+      } else {
+        cout << "runAsFileProcessor-unknown-measurement_pack.sensor_type_:" << measurementPackage.sensor_type_ << endl;
+      }
+    }
+  } else {
+    cout<<"runAsFileProcessor-theFileName: <"<< theFileName << "> failed to open\n";
+    return 1;
+  }
+  measurementFile.close();
+  return 0;
+}
+
+int main(int argc, char *argv[])
 {
   uWS::Hub h;
 
   // Create a Kalman Filter instance
+  UKFProcessor ukfProcessor;
   UKF ukf;
 
   // used to compute the RMSE later
   Tools tools;
   vector<VectorXd> estimations;
   vector<VectorXd> ground_truth;
+    
+  int status=0;
+  
+  if (Tools::TESTING) cout<<"argc: "<< argc <<"\n";
+  if (argc>1) {
+    if (Tools::TESTING) cout << "argv[0]: " << argv[0] << ", \nargv[1]: " << argv[1] << "\n";
+    status=runAsFileProcessor(ukfProcessor, argv[1]);
+  } else {
+    //status=runAsServer(fusionEKF);
+  }
+  if (Tools::TESTING) cout<< "status: " << status <<"\n";
+  return(status);
 
   h.onMessage([&ukf,&tools,&estimations,&ground_truth](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
