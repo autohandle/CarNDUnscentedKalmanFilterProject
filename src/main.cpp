@@ -197,9 +197,27 @@ int main(int argc, char *argv[])
 {
   uWS::Hub h;
 
+  // Laser measurement noise standard deviation position1 in m
+  const double std_laspx_ = 0.15;
+  
+  // Laser measurement noise standard deviation position2 in m
+  const double std_laspy_ = 0.15;
+  
+  // Radar measurement noise standard deviation radius in m
+  const double std_radr_ = 0.3;
+  
+  // Radar measurement noise standard deviation angle in rad
+  const double std_radphi_ = 0.03;
+  
+  // Radar measurement noise standard deviation radius change in m/s
+  const double std_radrd_ = 0.3;
+  
+  MatrixXd radarR = UKF::newR(3,std_radr_, std_radphi_, std_radrd_);
+  MatrixXd lidarR = UKF::newR(2, std_laspx_, std_laspy_);
+  
   // Create a Kalman Filter instance
-  UKFProcessor ukfProcessor;
-  UKF ukf;
+  UKFProcessor ukfProcessor=UKFProcessor(5/*number of states*/,7/*numberof augmented states*/, radarR, lidarR);
+  //UKF ukf;
 
   // used to compute the RMSE later
   Tools tools;
@@ -211,6 +229,7 @@ int main(int argc, char *argv[])
   if (Tools::TESTING) cout<<"argc: "<< argc <<"\n";
   if (argc>1) {
     if (Tools::TESTING) cout << "argv[0]: " << argv[0] << ", \nargv[1]: " << argv[1] << "\n";
+    UKFProcessor::testRadar();
     status=runAsFileProcessor(ukfProcessor, argv[1]);
   } else {
     //status=runAsServer(fusionEKF);
@@ -218,7 +237,8 @@ int main(int argc, char *argv[])
   if (Tools::TESTING) cout<< "status: " << status <<"\n";
   return(status);
 
-  h.onMessage([&ukf,&tools,&estimations,&ground_truth](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+//  h.onMessage([&ukf,&tools,&estimations,&ground_truth](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  h.onMessage([&ukfProcessor,&tools,&estimations,&ground_truth](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -286,16 +306,21 @@ int main(int argc, char *argv[])
     	  ground_truth.push_back(gt_values);
           
           //Call ProcessMeasurment(meas_package) for Kalman filter
-    	  ukf.ProcessMeasurement(meas_package);    	  
+//    	  ukf.ProcessMeasurement(meas_package);
+          ukfProcessor.ProcessMeasurement(meas_package);
 
     	  //Push the current estimated x,y positon from the Kalman filter's state vector
 
     	  VectorXd estimate(4);
 
-    	  double p_x = ukf.x_(0);
-    	  double p_y = ukf.x_(1);
-    	  double v  = ukf.x_(2);
-    	  double yaw = ukf.x_(3);
+    	  //double p_x = ukf.x_(0);
+    	  //double p_y = ukf.x_(1);
+    	  //double v  = ukf.x_(2);
+    	  //double yaw = ukf.x_(3);
+          double p_x = ukfProcessor.x()(0);
+          double p_y = ukfProcessor.x()(1);
+          double v  = ukfProcessor.x()(2);
+          double yaw = ukfProcessor.x()(3);
 
     	  double v1 = cos(yaw)*v;
     	  double v2 = sin(yaw)*v;

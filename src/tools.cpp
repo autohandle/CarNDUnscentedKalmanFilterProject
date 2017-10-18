@@ -47,10 +47,11 @@ VectorXd Tools::CalculateRMSE(const vector<VectorXd> &estimations,
 
 bool Tools::areSame(VectorXd a, VectorXd b) {
   for (int r=0; r<a.rows(); r++) {
-    if (!Tools::areSame(a[r],b[r])) {
+    if (!Tools::areSame(a(r),b(r))) {
       std::cout << std::endl
       << "a(" << r << "):" << a(r) << " != "
-      << "b(" << r << "):" << b(r)
+      << "b(" << r << "):" << b(r) << " == "
+      << "fabs(a-b):" << fabs(a(r) - b(r))
       << std::endl;
       return false;
     }
@@ -64,7 +65,8 @@ bool Tools::areSame(MatrixXd a, MatrixXd b) {
       if (!Tools::areSame(a(r,c),b(r,c))) {
         std::cout << std::endl
         << "a(" << r << "," << c << "):" << a(r,c) << " != "
-        << "b(" << r << "," << c << "):" << b(r,c)
+        << "b(" << r << "," << c << "):" << b(r,c) << " == "
+        << "fabs(a-b):" << fabs(a(r,c) - b(r,c))
         << std::endl;
         return false;
       }
@@ -73,7 +75,7 @@ bool Tools::areSame(MatrixXd a, MatrixXd b) {
   return true;
 }
 
-static const double EPSILON=1.e-6;
+static const double EPSILON=1.e-5;
 
 bool Tools::areSame(double a, double b) {
   return fabs(a - b) < EPSILON;
