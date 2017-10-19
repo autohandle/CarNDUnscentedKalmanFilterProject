@@ -33,15 +33,15 @@ public:
    */
   virtual ~KalmanState();
   
-  VectorXd& x() {
+  const VectorXd& x() {// process state vector
     return x_;
   }
   
-  MatrixXd& P() {
+  const MatrixXd& P() {// process covariance
     return P_;
   }
   
-  int n_x() {
+  const int n_x() {// size of state vector
     return x().size();
   }
 
@@ -52,8 +52,10 @@ class UKF {
 private:
   
   KalmanState kalmanState;
-  MatrixXd R_;
-  int n_aug_;
+  MatrixXd R_;// noise covariance matrix
+  MatrixXd Q_;// process covariance matrix
+  int n_aug_;// number of augmented states
+  int n_z_;// number of measurements from sensor
   
 public:
 
@@ -103,12 +105,12 @@ public:
   }
 
   ///* State dimension
-  int n_x() {
+  const int n_x() {
     return kalmanState.n_x();
   }
 
   ///* Augmented state dimension
-  int n_aug() {
+  const int n_aug() {
     return n_aug_;
   }
 
@@ -118,15 +120,26 @@ public:
     return lambda_;
   }
   
-  //add measurement noise covariance matrix
-  MatrixXd& R() {
+  //measurement noise covariance matrix
+  const MatrixXd& R() {
     return R_;
+  }
+  
+  //process noise covariance matrix
+  const MatrixXd& Q() {
+    return Q_;
+  }
+
+  //process noise covariance matrix
+  const int n_z() {
+    return n_z_;
   }
 
   /**
    * Constructor
    */
-  UKF(const int n_aug, KalmanState theKalmanState, Eigen::MatrixXd theMeasurementNoiseCovariance);
+  UKF(const int n_aug, const int n_z, KalmanState theKalmanState,
+      Eigen::MatrixXd theMeasurementNoiseCovariance/*R*/, Eigen::MatrixXd theProcessNoiseCovariance/*Q*/);
 
   /**
    * Destructor
@@ -147,7 +160,10 @@ public:
    * matrix
    * @param delta_t Time between k and k+1 in s
    */
-  void Prediction(double delta_t);
+  KalmanState Prediction(const double delta_t);
+  KalmanState Update(const MeasurementPackage meas_package, const Eigen::MatrixXd xSigPredicted);
+  KalmanState Update(const Eigen::VectorXd z, const Eigen::MatrixXd xSigPredicted);
+
 
   /**
    * Updates the state and the state covariance matrix using a laser measurement
@@ -162,31 +178,48 @@ public:
   void UpdateRadar(MeasurementPackage meas_package);
   
   std::string toString();
-  static Eigen::MatrixXd newR(int numberOfArguments, ...);
+  static Eigen::MatrixXd newCovariance(int numberOfArguments, ...);
   
-  VectorXd& x() {
+  const VectorXd& x() {
     return kalmanState.x();
   }
   
-  MatrixXd& P() {
+  const MatrixXd& P() {
     return kalmanState.P();
   }
   
   static void testGenerateSigmaPoints();
   static void testAugmentedSigmaPoints();
+  static void testUpdateState();
+  static void testSigmaPointPrediction();
+  static void testPredictZMeasurement();
+  static void testPredictMeanAndCovariance();
+  static void testPrediction();
 
-  
 private:
   
 protected:
   static VectorXd calculateWeights(const int lambda, const int n_aug);
-  static int calculateLambda(const int n_aug);
+  static int calculateLambda(const int theSizeOfTheStateVector);// maybe the actual vector n_x or augmented n_aug
+  
   static double normalizeAngle(const double theAngle);
-  virtual void generateSigmaPoints(MatrixXd* Xsig_out);
-  virtual void augmentedSigmaPoints(MatrixXd* Xsig_out);
-  virtual void predictZMeasurement(MatrixXd& xSigPredicted, VectorXd* z_out, MatrixXd* S_out);
-  virtual void predictMeanAndCovariance(MatrixXd& xSigPredicted, VectorXd* x_out, MatrixXd* P_out);
-  virtual void sigmaPointPrediction(double deltaT, MatrixXd& xSigAug, MatrixXd* Xsig_out);
+  virtual VectorXd normalizeStateVector(const VectorXd& theStateVector);
+  virtual VectorXd normalizeMeasurementVector(const VectorXd& theMeasurementVector);
+
+  virtual MatrixXd generateSigmaPoints();
+  virtual MatrixXd augmentSigmaPoints();
+  virtual MatrixXd sigmaPointPrediction(const double deltaT, const MatrixXd& xSigAug);
+  virtual KalmanState predictMeanAndCovariance(const MatrixXd& xSigPredicted);
+
+  virtual void predictZMeasurement(const MatrixXd& Zsig, const VectorXd& zPredicted, VectorXd* z_out, MatrixXd* S_out);
+  virtual VectorXd predictZ(const MatrixXd& Zsig);
+  virtual MatrixXd transformSigmaPointsToMeasurements(const MatrixXd& xSigPredicted);
+  virtual MatrixXd measurementCovarianceMatrix(const MatrixXd& Zsig, const VectorXd& zPredicted);
+  virtual VectorXd extractZMeasurement(const MeasurementPackage theMeasurementPackage);
+  virtual VectorXd transformStateToMeasurement(const VectorXd theState);
+
+  virtual KalmanState updateState(const Eigen::MatrixXd Zsig, const Eigen::MatrixXd& z_pred, const Eigen::MatrixXd& Xsig_pred, const Eigen::MatrixXd& S, const Eigen::VectorXd& z);
+
 };
 
 class RadarFilter: public UKF {
@@ -195,18 +228,15 @@ public:
   /**
    * Constructor
    */
-  RadarFilter(int theNumberofAugmentedStates, KalmanState theKalmanState, Eigen::MatrixXd theMeasurementNoiseCovariance);
+  RadarFilter(int theNumberofAugmentedStates, KalmanState theKalmanState,
+              Eigen::MatrixXd theMeasurementNoiseCovariance/*R*/, Eigen::MatrixXd theProcessNoiseCovariance/*Q*/);
   
   void initialize(MeasurementPackage theRadarMeasurementPackage);
   void updateX(const VectorXd &theRadarMeasurement);
-  void predictZMeasurement(MatrixXd& xSigPredicted, VectorXd* z_out, MatrixXd* S_out);
-  void predictMeanAndCovariance(MatrixXd& xSigPredicted, VectorXd* x_out, MatrixXd* P_out);
-  void sigmaPointPrediction(double deltaT, MatrixXd& xSigAug, MatrixXd* Xsig_out);
+  VectorXd transformStateToMeasurement(const VectorXd theState);
 
-  static void testPredictZMeasurement();
-  static void testPredictMeanAndCovariance();
-  static void testSigmaPointPrediction();
-  static void testGenerateSigmaPoints();
+  VectorXd normalizeStateVector(const VectorXd& theStateVector);
+  VectorXd normalizeMeasurementVector(const VectorXd& theMeasurementVector);
   
 };
 
@@ -216,12 +246,12 @@ public:
   /**
    * Constructor
    */
-  LidarFilter(int theNumberofAugmentedStates, KalmanState theKalmanState, Eigen::MatrixXd theMeasurementNoiseCovariance);
+  LidarFilter(const int theNumberofAugmentedStates, KalmanState theKalmanState,
+              Eigen::MatrixXd theMeasurementNoiseCovariance/*R*/, Eigen::MatrixXd theProcessNoiseCovariance/*Q*/);
   
   void initialize(MeasurementPackage theLidarMeasurementPackage);
   void updateX(const VectorXd &theLidarMeasurement);
-  void predictZMeasurement(MatrixXd& xSigPredicted, VectorXd* z_out, MatrixXd* S_out);
-
+  VectorXd transformStateToMeasurement(const VectorXd theState);
 
 };
 
@@ -244,7 +274,8 @@ public:
   /**
    * Constructor
    */
-  UKFProcessor(int theNumberOfStates, int theNumberOfAugmentedStates, MatrixXd& theRadarR, MatrixXd& theLidarR);
+  UKFProcessor(int theNumberOfStates, int theNumberOfAugmentedStates,
+               MatrixXd& theRadarR, MatrixXd& theLidarR, MatrixXd& theProcessNoiseQ);
   
   /**
    * Destructor
@@ -261,11 +292,11 @@ public:
     return use_radar_;
   }
   
-  VectorXd& x() {
+  const VectorXd& x() {
     return kalmanState.x();
   }
   
-  MatrixXd& P() {
+  const MatrixXd& P() {
     return kalmanState.P();
   }
   

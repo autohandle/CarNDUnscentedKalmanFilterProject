@@ -196,6 +196,15 @@ int runAsFileProcessor(UKFProcessor theUKFProcessor, std::string theFileName) {
 int main(int argc, char *argv[])
 {
   uWS::Hub h;
+  
+  // Process noise standard deviation longitudinal acceleration in m/s^2
+  double std_a_ = 30;
+  
+  // Process noise standard deviation yaw acceleration in rad/s^2
+  double std_yawdd_ = 30;
+  
+  MatrixXd processNoiseQ = UKF::newCovariance(2, std_a_, std_yawdd_);
+
 
   // Laser measurement noise standard deviation position1 in m
   const double std_laspx_ = 0.15;
@@ -212,11 +221,12 @@ int main(int argc, char *argv[])
   // Radar measurement noise standard deviation radius change in m/s
   const double std_radrd_ = 0.3;
   
-  MatrixXd radarR = UKF::newR(3,std_radr_, std_radphi_, std_radrd_);
-  MatrixXd lidarR = UKF::newR(2, std_laspx_, std_laspy_);
-  
+  MatrixXd radarR = UKF::newCovariance(3,std_radr_, std_radphi_, std_radrd_);
+  MatrixXd lidarR = UKF::newCovariance(2, std_laspx_, std_laspy_);
+
   // Create a Kalman Filter instance
-  UKFProcessor ukfProcessor=UKFProcessor(5/*number of states*/,7/*numberof augmented states*/, radarR, lidarR);
+  UKFProcessor ukfProcessor=UKFProcessor(5/*number of states*/,7/*numberof augmented states*/,
+                                         radarR, lidarR, processNoiseQ);
   //UKF ukf;
 
   // used to compute the RMSE later
