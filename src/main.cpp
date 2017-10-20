@@ -135,27 +135,59 @@ VectorXd compareRSME(VectorXd thePreviousRSME, VectorXd theCurrentRSME) {
   return comparison;
 }
 
-int runAsFileProcessor(UKFProcessor theUKFProcessor, std::string theFileName) {
+bool isRadar(const MeasurementPackage theMeasurementPackage) {
+  return theMeasurementPackage.sensor_type_==MeasurementPackage::RADAR;
+}
+
+bool isLidar(const MeasurementPackage theMeasurementPackage) {
+  return theMeasurementPackage.sensor_type_==MeasurementPackage::LASER;
+}
+
+bool isProcessingSensorMeasurement(const MeasurementPackage theMeasurementPackage, UKFProcessor theUKFProcessor) {
+  return (isRadar(theMeasurementPackage) && theUKFProcessor.useRadar()) || (isLidar(theMeasurementPackage) && theUKFProcessor.useLidar());
+}
+
+VectorXd transformKalmanStateToGroundTruthState(const VectorXd& theKalmanState) {
+  assert(theKalmanState.size()==5);
+  // extract values for better readibility
+  const double px = theKalmanState(0);
+  const double py = theKalmanState(1);
+  const double v  = theKalmanState(2);
+  const double yaw = theKalmanState(3);
+  const double yawd = theKalmanState(4);
+  
+  const double vx = v * cos(yaw);
+  const double vy = v * sin(yaw);
+  
+  VectorXd groundTruthState = VectorXd(4);// px, py, vx, vy
+  // measurement model
+  groundTruthState(0) = px;
+  groundTruthState(1) = py;
+  groundTruthState(2) = vx;
+  groundTruthState(3) = vy;
+  
+  return groundTruthState;
+}
+
+VectorXd transformKalmanStateToGroundTruthState(KalmanState& theKalmanState) {
+  return transformKalmanStateToGroundTruthState(theKalmanState.x());
+}
+
+VectorXd runAsFileProcessor(UKFProcessor theUKFProcessor, std::string theFileName) {
   
   ifstream measurementFile;
   measurementFile.open(theFileName, ios::in);
   if (Tools::TESTING) cout<<"runAsFileProcessor-theFileName: <"<< theFileName << ">, is_open? " << measurementFile.is_open() << "\n";
   
-  int noise_ax = 5;
-  int noise_ay = 5;
   int lineNumber = 0;
-  VectorXd noise = VectorXd(2);
-  VectorXd previousRSME = Eigen::VectorXd(4);
-  previousRSME << 0,0,0,0;
-  noise << noise_ax, noise_ay;
-  if (Tools::TESTING) std::cout << "noise:" <<  noise << std::endl;
   
   if (measurementFile.is_open()) {
     vector<VectorXd> estimates;
     vector<VectorXd> groundTruthVector;
     if (Tools::TESTING) cout<<"runAsFileProcessor-theFileName: "<< theFileName << "\n";
     string measurementLine;
-    while ( getline (measurementFile, measurementLine) ){
+    VectorXd rsme;
+    while ( getline (measurementFile, measurementLine) ) {
       lineNumber++;
       if (Tools::TESTING) {
         cout << "l-------------------------------------------" << "\n"
@@ -163,34 +195,32 @@ int runAsFileProcessor(UKFProcessor theUKFProcessor, std::string theFileName) {
         << "l-------------------------------------------" << "\n";
       }
       MeasurementPackage measurementPackage = createMeasurementPackage(measurementLine);
-      if (    (measurementPackage.sensor_type_ == MeasurementPackage::RADAR && theUKFProcessor.useRadar())
-          ||  (measurementPackage.sensor_type_ == MeasurementPackage::LASER&& theUKFProcessor.useLidar()) ) {
-        theUKFProcessor.ProcessMeasurement(measurementPackage);
-        
+
+      if (isProcessingSensorMeasurement(measurementPackage, theUKFProcessor)) {
+        double nis = theUKFProcessor.ProcessMeasurement(measurementPackage);
+        KalmanState kalmanState = theUKFProcessor.kalmanState();
+
         VectorXd groundTruthValues = createGroundTruthVector(measurementLine);
         if (Tools::TESTING) cout<<"runAsFileProcessor-groundTruthValues: <"<< Tools::toString(groundTruthValues) << "\n";
         groundTruthVector.push_back(groundTruthValues);
-        VectorXd estimate = createEstimateVector(theUKFProcessor.x());
+        VectorXd estimate = transformKalmanStateToGroundTruthState(kalmanState);
         if (Tools::TESTING) cout<<"runAsFileProcessor-estimate: <"<< Tools::toString(estimate) << "\n";
         estimates.push_back(estimate);
-        VectorXd rsme = Tools::CalculateRMSE(estimates, groundTruthVector);
-        if (true || Tools::TESTING) cout<<"runAsFileProcessor-rsme: <"<< Tools::toString(rsme) << "\n";
+        rsme = Tools::CalculateRMSE(estimates, groundTruthVector);
         if (Tools::TESTING) {
-          cout << "r-------------------------------------------" << "\n"
-          << "<" << Tools::toString(compareRSME(previousRSME, rsme)) << ">\n"
-          << "-r------------------------------------------" << "\n";
+          cout <<"runAsFileProcessor-rsme: <"<< Tools::toString(rsme) << "\n";
+          cout << "nis: " << nis << ">\n";
         }
-        previousRSME=rsme;
-      } else {
-        cout << "runAsFileProcessor-unknown-measurement_pack.sensor_type_:" << measurementPackage.sensor_type_ << endl;
       }
     }
+    measurementFile.close();
+    return rsme;
   } else {
     cout<<"runAsFileProcessor-theFileName: <"<< theFileName << "> failed to open\n";
-    return 1;
+    throw std::logic_error("file error");
   }
   measurementFile.close();
-  return 0;
+  throw std::logic_error("? error");
 }
 
 int main(int argc, char *argv[])
@@ -198,10 +228,11 @@ int main(int argc, char *argv[])
   uWS::Hub h;
   
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  double std_a_ = 30;
+  const double std_a_ = 0.6;//0.5;//0.7;
+  
   
   // Process noise standard deviation yaw acceleration in rad/s^2
-  double std_yawdd_ = 30;
+  const double std_yawdd_ = 0.6;//0.8;//0.6;
   
   MatrixXd processNoiseQ = UKF::newCovariance(2, std_a_, std_yawdd_);
 
@@ -225,7 +256,8 @@ int main(int argc, char *argv[])
   MatrixXd lidarR = UKF::newCovariance(2, std_laspx_, std_laspy_);
 
   // Create a Kalman Filter instance
-  UKFProcessor ukfProcessor=UKFProcessor(5/*number of states*/,7/*numberof augmented states*/,
+  KalmanState kalmanState = KalmanState(5);
+  UKFProcessor ukfProcessor=UKFProcessor(kalmanState,7/*numberof augmented states*/,
                                          radarR, lidarR, processNoiseQ);
   //UKF ukf;
 
@@ -237,15 +269,37 @@ int main(int argc, char *argv[])
   int status=0;
   
   if (Tools::TESTING) cout<<"argc: "<< argc <<"\n";
-  if (argc>1) {
-    if (Tools::TESTING) cout << "argv[0]: " << argv[0] << ", \nargv[1]: " << argv[1] << "\n";
-    UKFProcessor::testRadar();
-    status=runAsFileProcessor(ukfProcessor, argv[1]);
+  if (Tools::FILETESTING && argc>1) {
+    if (Tools::TESTING) {
+      cout << "argv[0]: " << argv[0] << ", \nargv[1]: " << argv[1] << "\n";
+    }
+    //Tools::testRadar();
+    VectorXd rsme=runAsFileProcessor(ukfProcessor, argv[1]);
   } else {
     //status=runAsServer(fusionEKF);
   }
-  if (Tools::TESTING) cout<< "status: " << status <<"\n";
-  return(status);
+  if (Tools::FILETESTING) {
+    cout<< "status: " << status <<"\n";
+    return(status);
+  }
+  
+  if (Tools::SEARCHING && (argc>1)) {
+    cout<<"SEARCHING argc: "<< argc <<"\n";
+    for (int standardDeviation=1; standardDeviation<10; standardDeviation++) {
+      estimations.clear();
+      ground_truth.clear();
+      MatrixXd processNoiseQ = UKF::newCovariance(2, standardDeviation*0.1, 0.6);
+      KalmanState kalmanState = KalmanState(5);
+      cout <<"SEARCHING-standardDeviation: "<< standardDeviation*0.1 << "\n";
+      cout <<"SEARCHING-processNoiseQ: <"<< Tools::toString(processNoiseQ) << "\n";
+      UKFProcessor ukfProcessor = UKFProcessor(kalmanState,7/*numberof augmented states*/,
+                                               radarR, lidarR, processNoiseQ);
+      VectorXd rsme = runAsFileProcessor(ukfProcessor, argv[1]);
+      cout <<"SEARCHING-rsme: <"<< Tools::toString(rsme) << "\n";
+    }
+    return(status);
+  }
+
 
 //  h.onMessage([&ukf,&tools,&estimations,&ground_truth](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
   h.onMessage([&ukfProcessor,&tools,&estimations,&ground_truth](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {

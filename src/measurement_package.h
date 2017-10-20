@@ -2,6 +2,7 @@
 #define MEASUREMENT_PACKAGE_H_
 
 #include "Eigen/Dense"
+#include <string>
 
 class MeasurementPackage {
 public:
@@ -15,6 +16,7 @@ public:
 
   Eigen::VectorXd raw_measurements_;
 
+  static const std::string SensorTypeToString;
 };
 
 #endif /* MEASUREMENT_PACKAGE_H_ */
