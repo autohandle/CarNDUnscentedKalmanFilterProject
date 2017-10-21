@@ -53,7 +53,7 @@ Connected!!!
 #### Accuracy
 #####  run against "obj_pose-laser-radar-synthetic-input.txt" RMSE should be less than or equal to the values [.09, .10, .40, .30]
 
-The Unscented Kalman Filter run on obj_pose-laser-radar-synthetic-input.txt had a final RSME of: \[0.0616555, 0.0847325, 0.32956, 0.212253\]. The initial covariance P value was the Identity matrix set in the constructor, the inital x state was set by the firsr measurement value, a Laser measurement. The initial values for both std_a_  and std_yawdd_ were 0.6.
+The Unscented Kalman Filter run on obj_pose-laser-radar-synthetic-input.txt had a final RSME of: \[0.0616555, 0.0847325, 0.32956, 0.212253\]. The initial covariance P value was the Identity matrix set in the constructor, the inital x state was set by the first measurement value, a Laser measurement. The initial values for both std_a_  and std_yawdd_ were 0.6.
 
 #### Follows the Correct Algorithm
 #### Sensor Fusion algorithm
@@ -62,20 +62,15 @@ The algorithm is implemented in
 
 ``` C++
 double UKF::ProcessMeasurement(const MeasurementPackage& theMeasurementPackage, const double theDeltaT) {
-  	MatrixXd sigmaPointsPrediction = Prediction(theDeltaT);
-  	double nis = Update(theMeasurementPackage, sigmaPointsPrediction);// updates KalmanState
-  	return nis;
-	}
+  MatrixXd sigmaPointsPrediction = Prediction(theDeltaT);
+  double nis = Update(theMeasurementPackage, sigmaPointsPrediction);// updates KalmanState
+  return nis;
+}
 ```
 [UKF::Prediction](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/ukf.cpp#L151-L164)
-takes `deltaT` and predicts the location of the sigma point. It also updates the kalman state with the predicted values for: the state vector and the covariance matrix.
+takes `deltaT` and predicts the location of the augmented sigma points. It also updates the kalman state with the predicted values for: the state vector and the covariance matrix.
 ``` C++
 MatrixXd UKF::Prediction(double deltaT) {// updates KalmanState, returns Xsig_pred
-  /**
-  TODO:
-  Complete this function! Estimate the object's location. Modify the state
-  vector, x_. Predict sigma points, the state, and the state covariance matrix.
-  */
   const MatrixXd sigmaPoints = generateSigmaPoints();
   const MatrixXd augmentedSigmaPoints = augmentSigmaPoints();
   const MatrixXd sigmaPointsPrediction = sigmaPointPrediction(deltaT, augmentedSigmaPoints);
@@ -85,15 +80,13 @@ MatrixXd UKF::Prediction(double deltaT) {// updates KalmanState, returns Xsig_pr
 }
 ```
 [UKF::Update](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/ukf.cpp#L166-L178)
-takes the locations of the predicited sigma point and the new measurement and updates the kalman state: the state vector and the covariance matrix.
+takes the locations of the predicted sigma points and the new measurement and updates the kalman state: the state vector and the covariance matrix.
 ``` C++
 double UKF::Update(const MeasurementPackage& theMeasurementPackage, const Eigen::MatrixXd& xSigPredicted) {
   return Update(extractZMeasurement(theMeasurementPackage),xSigPredicted);
 }
 
 double UKF::Update(const Eigen::VectorXd& z, const Eigen::MatrixXd& xSigPredicted) {
-  if (Tools::TESTING) std::cout << "UKF::Update-z = " << std::endl << z << std::endl;
-  if (Tools::TESTING) std::cout << "UKF::Update-xSigPredicted = " << std::endl << xSigPredicted << std::endl;
   MatrixXd zSigmaPoints = transformSigmaPointsToMeasurements(xSigPredicted);
   VectorXd zPredicted = predictZ(zSigmaPoints);
   MatrixXd S = measurementCovarianceMatrix(zSigmaPoints, zPredicted);
@@ -148,7 +141,7 @@ double UKFProcessor::ProcessMeasurement(const MeasurementPackage& theMeasurement
 ```
 `UKFProcessor::processMeasurement` can then call
 [UKFProcessor::initialize](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/ukf.cpp#L805-L841)
-to have the filter convert the measurement into a state to initialize the first kalman state.
+to have the correct filter convert the measurement into a state to initialize the first kalman state.
 ``` C++
 void UKFProcessor::initialize(const MeasurementPackage& theMeasurementPackage,
                               UKF *theFilter,
@@ -164,31 +157,17 @@ void UKFProcessor::initialize(const MeasurementPackage& theMeasurementPackage,
                               const VectorXd theInitialState,
                               KalmanState& theKalmanState) {
   if (!is_initialized()) {
-    /**
-     TODO:
-     * Initialize the state ekf_.x_ with the first measurement.
-     * Create the covariance matrix.
-     * Remember: you'll need to convert radar from polar to cartesian coordinates.
-     */
-    
-    //previous_timestamp_= theMeasurementPackage.timestamp_; // initial dt == 0.
     time_us_= theMeasurementPackage.timestamp_;
-    
-    // first measurement
-    
-    assert(theKalmanState.n_x()>0);
-    
+        
     KalmanState newKalmanState=
     KalmanState::KalmanState(theInitialState, theKalmanState.P());
     theKalmanState.update(newKalmanState);
+
     is_initialized_ = true;
-    if (Tools::TESTING) {
-      std::cout << "UKF::initialize:" << theKalmanState.toString() << std::endl;
-    }
   }
 }
 ```
-The
+To correct set the initial state, the
 [RadarFilter::transformMeasurementToState](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/ukf.cpp#L659-L677)
 ``` C++
 VectorXd RadarFilter::transformMeasurementToState(const VectorXd& theRawMeasurements) {
@@ -234,10 +213,10 @@ VectorXd LidarFilter::transformMeasurementToState(const VectorXd& theRawMeasurem
 first calls Prediction and then calls Update
 ``` C++
 double UKF::ProcessMeasurement(const MeasurementPackage& theMeasurementPackage, const double theDeltaT) {
-  	MatrixXd sigmaPointsPrediction = Prediction(theDeltaT);
-  	double nis = Update(theMeasurementPackage, sigmaPointsPrediction);// updates KalmanState
-  	return nis;
-	}
+  MatrixXd sigmaPointsPrediction = Prediction(theDeltaT);
+  double nis = Update(theMeasurementPackage, sigmaPointsPrediction);// updates KalmanState
+  return nis;
+}
 ```
 #### Can handle radar and lidar measurements.
 [UKFProcessor::ProcessMeasurement](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/ukf.cpp#L771-L790)
@@ -274,7 +253,7 @@ The program was restructured to use object inheritance to improved comprehension
 
 #### Setting sigma for `std_a_` and `std_yawdd_`
 
-`std_a_` and `std_yawdd_` we set using RSME handheld gradient descent in
+Although the nis was calculated, `std_a_` and `std_yawdd_` were set using RSME handheld gradient descent in
 [main.cpp](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/main.cpp#L286-L301)
 
 ``` C++
