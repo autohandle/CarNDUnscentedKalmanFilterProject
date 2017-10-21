@@ -207,7 +207,7 @@ VectorXd runAsFileProcessor(UKFProcessor theUKFProcessor, std::string theFileNam
         if (Tools::TESTING) cout<<"runAsFileProcessor-estimate: <"<< Tools::toString(estimate) << "\n";
         estimates.push_back(estimate);
         rsme = Tools::CalculateRMSE(estimates, groundTruthVector);
-        if (Tools::TESTING) {
+        if (Tools::FILETESTING || Tools::TESTING) {
           cout <<"runAsFileProcessor-rsme: <"<< Tools::toString(rsme) << "\n";
           cout << "nis: " << nis << ">\n";
         }

@@ -1,92 +1,412 @@
-# Unscented Kalman Filter Project Starter Code
-Self-Driving Car Engineer Nanodegree Program
+# Unscented Kalman Filter
 
-In this project utilize an Unscented Kalman Filter to estimate the state of a moving object of interest with noisy lidar and radar measurements. Passing the project requires obtaining RMSE values that are lower that the tolerance outlined in the project reburic. 
+#### Compiling
+##### Code must compile without errors with cmake and make.
 
-This project involves the Term 2 Simulator which can be downloaded [here](https://github.com/udacity/self-driving-car-sim/releases)
+``` shell
+	Softwares-MacBook-Pro:tmp david$ git clone https://github.com/autohandle/CarNDUnscentedKalmanFilterProject.git
+	Cloning into 'CarNDUnscentedKalmanFilterProject'...
+	remote: Counting objects: 513, done.
+	remote: Compressing objects: 100% (375/375), done.
+	remote: Total 513 (delta 135), reused 513 (delta 135), pack-reused 0
+	Receiving objects: 100% (513/513), 876.45 KiB | 4.74 MiB/s, done.
+	Resolving deltas: 100% (135/135), done.
+	Softwares-MacBook-Pro:tmp david$ cd CarNDUnscentedKalmanFilterProject/
+	Softwares-MacBook-Pro:CarNDUnscentedKalmanFilterProject david$ ls
+	CMakeLists.txt		buildXcode		install-mac.sh		readme.txt
+	README.md		cmakepatch.txt		install-ubuntu.sh	src
+	Softwares-MacBook-Pro:CarNDUnscentedKalmanFilterProject david$ mkdir build
+	Softwares-MacBook-Pro:CarNDUnscentedKalmanFilterProject david$ cd build
+	Softwares-MacBook-Pro:build david$ cmake ..
+	-- The C compiler identification is AppleClang 9.0.0.9000037
+	-- The CXX compiler identification is AppleClang 9.0.0.9000037
+	-- Check for working C compiler: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc
+	-- Check for working C compiler: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc -- works
+	-- Detecting C compiler ABI info
+	-- Detecting C compiler ABI info - done
+	-- Detecting C compile features
+	-- Detecting C compile features - done
+	-- Check for working CXX compiler: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/c++
+	-- Check for working CXX compiler: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/c++ -- works
+	-- Detecting CXX compiler ABI info
+	-- Detecting CXX compiler ABI info - done
+	-- Detecting CXX compile features
+	-- Detecting CXX compile features - done
+	-- Configuring done
+	-- Generating done
+	-- Build files have been written to: /tmp/CarNDUnscentedKalmanFilterProject/build
+	Softwares-MacBook-Pro:build david$ make
+	Scanning dependencies of target UnscentedKF
+	[ 25%] Building CXX object CMakeFiles/UnscentedKF.dir/src/ukf.cpp.o
+	[ 50%] Building CXX object CMakeFiles/UnscentedKF.dir/src/main.cpp.o
+	[ 75%] Building CXX object CMakeFiles/UnscentedKF.dir/src/tools.cpp.o
+	[100%] Linking CXX executable UnscentedKF
+	ld: warning: directory not found for option '-L/usr/local/Cellar/libuv/1.11.0/lib'
+	[100%] Built target UnscentedKF
+	Softwares-MacBook-Pro:build david$ ./UnscentedKF
+	Listening to port 4567
+	Connected!!!
+```
 
-This repository includes two files that can be used to set up and intall [uWebSocketIO](https://github.com/uWebSockets/uWebSockets) for either Linux or Mac systems. For windows you can use either Docker, VMware, or even [Windows 10 Bash on Ubuntu](https://www.howtogeek.com/249966/how-to-install-and-use-the-linux-bash-shell-on-windows-10/) to install uWebSocketIO. Please see [this concept in the classroom](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/16cf4a78-4fc7-49e1-8621-3450ca938b77) for the required version and installation scripts.
+![Data Set 1](./images/DataSet1.png)
 
-Once the install for uWebSocketIO is complete, the main program can be built and ran by doing the following from the project top directory.
+#### Accuracy
+#####  run against "obj_pose-laser-radar-synthetic-input.txt" RMSE should be less than or equal to the values [.09, .10, .40, .30]
 
-1. mkdir build
-2. cd build
-3. cmake ..
-4. make
-5. ./UnscentedKF
+The Unscented Kalman Filter run on obj_pose-laser-radar-synthetic-input.txt had a final RSME of: \[0.0616555, 0.0847325, 0.32956, 0.212253\]. The initial covariance P value was the Identity matrix set in the constructor, the inital x state was set by the firsr measurement value, a Laser measurement. The initial values for both std_a_  and std_yawdd_ were 0.6.
 
-Tips for setting up your environment can be found [here](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/23d376c7-0195-4276-bdf0-e02f1f3c665d)
+#### Follows the Correct Algorithm
+#### Sensor Fusion algorithm
+The algorithm is implemented in
+[UKF::ProcessMeasurement](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/ukf.cpp#L133-L144)
 
-Note that the programs that need to be written to accomplish the project are src/ukf.cpp, src/ukf.h, tools.cpp, and tools.h
+``` C++
+double UKF::ProcessMeasurement(const MeasurementPackage& theMeasurementPackage, const double theDeltaT) {
+  	MatrixXd sigmaPointsPrediction = Prediction(theDeltaT);
+  	double nis = Update(theMeasurementPackage, sigmaPointsPrediction);// updates KalmanState
+  	return nis;
+	}
+```
+[UKF::Prediction](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/ukf.cpp#L151-L164)
+takes `deltaT` and predicts the location of the sigma point. It also updates the kalman state with the predicted values for: the state vector and the covariance matrix.
+``` C++
+MatrixXd UKF::Prediction(double deltaT) {// updates KalmanState, returns Xsig_pred
+  /**
+  TODO:
+  Complete this function! Estimate the object's location. Modify the state
+  vector, x_. Predict sigma points, the state, and the state covariance matrix.
+  */
+  const MatrixXd sigmaPoints = generateSigmaPoints();
+  const MatrixXd augmentedSigmaPoints = augmentSigmaPoints();
+  const MatrixXd sigmaPointsPrediction = sigmaPointPrediction(deltaT, augmentedSigmaPoints);
+  KalmanState predictedKalmanState=predictMeanAndCovariance(sigmaPointsPrediction);
+  updateKalmanState(predictedKalmanState);
+  return sigmaPointsPrediction;
+}
+```
+[UKF::Update](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/ukf.cpp#L166-L178)
+takes the locations of the predicited sigma point and the new measurement and updates the kalman state: the state vector and the covariance matrix.
+``` C++
+double UKF::Update(const MeasurementPackage& theMeasurementPackage, const Eigen::MatrixXd& xSigPredicted) {
+  return Update(extractZMeasurement(theMeasurementPackage),xSigPredicted);
+}
 
-The program main.cpp has already been filled out, but feel free to modify it.
+double UKF::Update(const Eigen::VectorXd& z, const Eigen::MatrixXd& xSigPredicted) {
+  if (Tools::TESTING) std::cout << "UKF::Update-z = " << std::endl << z << std::endl;
+  if (Tools::TESTING) std::cout << "UKF::Update-xSigPredicted = " << std::endl << xSigPredicted << std::endl;
+  MatrixXd zSigmaPoints = transformSigmaPointsToMeasurements(xSigPredicted);
+  VectorXd zPredicted = predictZ(zSigmaPoints);
+  MatrixXd S = measurementCovarianceMatrix(zSigmaPoints, zPredicted);
+  double nis = updateState(zSigmaPoints, zPredicted, xSigPredicted, S, z);
+  return nis;
+}
+```
+#### Handles the first measurements appropriately
 
-Here is the main protcol that main.cpp uses for uWebSocketIO in communicating with the simulator.
+The first measurement is recognized in 
+[UKFProcessor::processMeasurement](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/ukf.cpp#L792-L798)
+because `is_initialized` is not set.
+``` C++
+double UKFProcessor::processMeasurement(const MeasurementPackage& theMeasurementPackage,
+                                              UKF *theFilter) {
+  
+  if (!is_initialized()) {
+    initialize(theMeasurementPackage, theFilter, kalmanState());
+    return 0.;
+  }
+
+  double deltaT=(theMeasurementPackage.timestamp_-time_us_)/1000000.;//in seconds
+  time_us_= theMeasurementPackage.timestamp_;
+  return (*theFilter).ProcessMeasurement(theMeasurementPackage, deltaT);
+}
+```
+`UKFProcessor::processMeasurement` is called by [UKFProcessor::ProcessMeasurement](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/ukf.cpp#L771-L790)
+after the correct filter \(Radar or Lidar\) in the
+[MeasurementPackage](./src/measurement_package.h)
+is identified.
+``` C++
+double UKFProcessor::ProcessMeasurement(const MeasurementPackage& theMeasurementPackage) {
+  
+  switch(theMeasurementPackage.sensor_type_) {
+    case MeasurementPackage::RADAR :
+      if (Tools::TESTING) std::cout << "UKFProcessor::RADAR" << std::endl;
+      if (useRadar()) {
+        return processMeasurement(theMeasurementPackage, &radarFilter);
+      }
+      break;
+    case MeasurementPackage::LASER :
+      if (Tools::TESTING) std::cout << "UKFProcessor::LIDAR" << std::endl;
+      if (useLidar()) {
+        return processMeasurement(theMeasurementPackage, &lidarFilter);
+      }
+      break;
+    default :
+      throw std::invalid_argument("");
+  }
+  throw std::logic_error("Not Implemented");
+}
+```
+`UKFProcessor::processMeasurement` can then call
+[UKFProcessor::initialize](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/ukf.cpp#L805-L841)
+to have the filter convert the measurement into a state to initialize the first kalman state.
+``` C++
+void UKFProcessor::initialize(const MeasurementPackage& theMeasurementPackage,
+                              UKF *theFilter,
+                              KalmanState& theKalmanState) {
+  if (!is_initialized()) {
+    initialize(theMeasurementPackage,
+               (*theFilter).transformMeasurementToState(theMeasurementPackage.raw_measurements_),
+               theKalmanState);
+  }
+}
+
+void UKFProcessor::initialize(const MeasurementPackage& theMeasurementPackage,
+                              const VectorXd theInitialState,
+                              KalmanState& theKalmanState) {
+  if (!is_initialized()) {
+    /**
+     TODO:
+     * Initialize the state ekf_.x_ with the first measurement.
+     * Create the covariance matrix.
+     * Remember: you'll need to convert radar from polar to cartesian coordinates.
+     */
+    
+    //previous_timestamp_= theMeasurementPackage.timestamp_; // initial dt == 0.
+    time_us_= theMeasurementPackage.timestamp_;
+    
+    // first measurement
+    
+    assert(theKalmanState.n_x()>0);
+    
+    KalmanState newKalmanState=
+    KalmanState::KalmanState(theInitialState, theKalmanState.P());
+    theKalmanState.update(newKalmanState);
+    is_initialized_ = true;
+    if (Tools::TESTING) {
+      std::cout << "UKF::initialize:" << theKalmanState.toString() << std::endl;
+    }
+  }
+}
+```
+The
+[RadarFilter::transformMeasurementToState](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/ukf.cpp#L659-L677)
+``` C++
+VectorXd RadarFilter::transformMeasurementToState(const VectorXd& theRawMeasurements) {
+  assert(n_z()==3);
+  assert(theRawMeasurements.size()==n_z());
+  double rho = theRawMeasurements(0);
+  double phi = theRawMeasurements(1);
+  double rhodot = theRawMeasurements(2);
+  
+  double vx = rho * cos(phi);
+  double vy = rho * sin(phi);
+  
+  assert(n_x()==5);
+  VectorXd state = VectorXd(n_x());
+  state(0) = rho*cos(phi);
+  state(1) = rho*sin(phi);
+  state(2) = sqrt(vx*vx+vy*vy);
+  state(3) = 0.;
+  state(4) = 0.;
+  return state;
+}
+```
+is different from the
+[LidarFilter::transformMeasurementToState](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/ukf.cpp#L723-L736)
+``` C++
+VectorXd LidarFilter::transformMeasurementToState(const VectorXd& theRawMeasurements) {
+  assert(n_z()==2);
+  assert(theRawMeasurements.size()==n_z());
+  double px = theRawMeasurements(0);
+  double py = theRawMeasurements(1);
+  assert(n_x()==5);
+  VectorXd state = VectorXd(n_x());
+  state(0) = px;
+  state(1) = py;
+  state(2) = 0.;
+  state(3) = 0.;
+  state(4) = 0.;
+  return state;
+}
+```
+#### Algorithm first predicts then updates
+[UKF::ProcessMeasurement](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/ukf.cpp#L133-L144)
+first calls Prediction and then calls Update
+``` C++
+double UKF::ProcessMeasurement(const MeasurementPackage& theMeasurementPackage, const double theDeltaT) {
+  	MatrixXd sigmaPointsPrediction = Prediction(theDeltaT);
+  	double nis = Update(theMeasurementPackage, sigmaPointsPrediction);// updates KalmanState
+  	return nis;
+	}
+```
+#### Can handle radar and lidar measurements.
+[UKFProcessor::ProcessMeasurement](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/ukf.cpp#L771-L790)
+selects the correct filter, either \(Radar or Lidar\) from the `sensor_type_` in the 
+[MeasurementPackage](./src/measurement_package.h).
+``` C++
+double UKFProcessor::ProcessMeasurement(const MeasurementPackage& theMeasurementPackage) {
+  
+  switch(theMeasurementPackage.sensor_type_) {
+    case MeasurementPackage::RADAR :
+      if (Tools::TESTING) std::cout << "UKFProcessor::RADAR" << std::endl;
+      if (useRadar()) {
+        return processMeasurement(theMeasurementPackage, &radarFilter);
+      }
+      break;
+    case MeasurementPackage::LASER :
+      if (Tools::TESTING) std::cout << "UKFProcessor::LIDAR" << std::endl;
+      if (useLidar()) {
+        return processMeasurement(theMeasurementPackage, &lidarFilter);
+      }
+      break;
+    default :
+      throw std::invalid_argument("");
+  }
+  throw std::logic_error("Not Implemented");
+}
+```
+#### Code Efficiency
+
+##### Your algorithm should avoid unnecessary calculations.
+
+The program was restructured to use object inheritance to improved comprehension and reduce the number of if-statement checks.
 
 
-INPUT: values provided by the simulator to the c++ program
+#### Setting sigma for `std_a_` and `std_yawdd_`
 
-["sensor_measurement"] => the measurment that the simulator observed (either lidar or radar)
+`std_a_` and `std_yawdd_` we set using RSME handheld gradient descent in
+[main.cpp](https://github.com/autohandle/CarNDUnscentedKalmanFilterProject/blob/c9128edb6d9b0dbce3230a258c313610472cc8e8/src/main.cpp#L286-L301)
 
+``` C++
+if (Tools::SEARCHING && (argc>1)) {
+cout<<"SEARCHING argc: "<< argc <<"\n";
+for (int standardDeviation=1; standardDeviation<10; standardDeviation++) {
+  estimations.clear();
+  ground_truth.clear();
+  MatrixXd processNoiseQ = UKF::newCovariance(2, standardDeviation*0.1, 0.6);
+  KalmanState kalmanState = KalmanState(5);
+  cout <<"SEARCHING-standardDeviation: "<< standardDeviation*0.1 << "\n";
+  cout <<"SEARCHING-processNoiseQ: <"<< Tools::toString(processNoiseQ) << "\n";
+  UKFProcessor ukfProcessor = UKFProcessor(kalmanState,7/*numberof augmented states*/,
+                                           radarR, lidarR, processNoiseQ);
+  VectorXd rsme = runAsFileProcessor(ukfProcessor, argv[1]);
+  cout <<"SEARCHING-rsme: <"<< Tools::toString(rsme) << "\n";
+}
+```
+First `std_yawdd_` was left at 30 and then `std_a_` was iterated from .1
+```
+SEARCHING-standardDeviation: 0.1
+SEARCHING-processNoiseQ: <[2x2]=
+[0.01    0],
+[   0 0.64]
+SEARCHING-rsme: <[4x_]:
+[0.0825591,
+0.126184,
+0.350278,
+0.247264]
 
-OUTPUT: values provided by the c++ program to the simulator
+...
 
-["estimate_x"] <= kalman filter estimated position x
-["estimate_y"] <= kalman filter estimated position y
-["rmse_x"]
-["rmse_y"]
-["rmse_vx"]
-["rmse_vy"]
+SEARCHING-standardDeviation: 0.5
+SEARCHING-processNoiseQ: <[2x2]=
+[0.25    0],
+[   0 0.64]
+SEARCHING-rsme: <[4x_]:
+[0.0597576,
+0.0865825,
+0.331234,
+0.215768]
+SEARCHING-standardDeviation: 0.6
+SEARCHING-processNoiseQ: <[2x2]=
+[0.36    0],
+[   0 0.64]
+SEARCHING-rsme: <[4x_]:
+[0.0610295,
+0.0852075,
+0.331,
+0.214751]
+SEARCHING-standardDeviation: 0.7
+SEARCHING-processNoiseQ: <[2x2]=
+[0.49    0],
+[   0 0.64]
 
----
+...
+...
+```
+then `std_a_` was set to .6 and `std_yawdd_` was iterated from .1
+```
+SEARCHING-standardDeviation: 0.1
+SEARCHING-processNoiseQ: <[2x2]=
+[0.36    0],
+[   0 0.01]
+SEARCHING-rsme: <[4x_]:
+[0.112037,
+0.112114,
+0.420742,
+0.327603]
+SEARCHING-standardDeviation: 0.2
+SEARCHING-processNoiseQ: <[2x2]=
+[0.36    0],
+[   0 0.04]
+SEARCHING-rsme: <[4x_]:
+[0.0745449,
+0.0870828,
+0.353645,
+0.246509]
 
-## Other Important Dependencies
-* cmake >= 3.5
-  * All OSes: [click here for installation instructions](https://cmake.org/install/)
-* make >= 4.1 (Linux, Mac), 3.81 (Windows)
-  * Linux: make is installed by default on most Linux distros
-  * Mac: [install Xcode command line tools to get make](https://developer.apple.com/xcode/features/)
-  * Windows: [Click here for installation instructions](http://gnuwin32.sourceforge.net/packages/make.htm)
-* gcc/g++ >= 5.4
-  * Linux: gcc / g++ is installed by default on most Linux distros
-  * Mac: same deal as make - [install Xcode command line tools](https://developer.apple.com/xcode/features/)
-  * Windows: recommend using [MinGW](http://www.mingw.org/)
+...
 
-## Basic Build Instructions
+SEARCHING-rsme: <[4x_]:
+[0.0636271,
+0.0843614,
+0.331769,
+0.215775]
+SEARCHING-standardDeviation: 0.5
+SEARCHING-processNoiseQ: <[2x2]=
+[0.36    0],
+[   0 0.25]
+SEARCHING-rsme: <[4x_]:
+[0.062336,
+0.0845163,
+0.329871,
+0.212797]
+SEARCHING-standardDeviation: 0.6
+SEARCHING-processNoiseQ: <[2x2]=
+[0.36    0],
+[   0 0.36]
+SEARCHING-rsme: <[4x_]:
+[0.0616555,
+0.0847325,
+0.32956,
+0.212253]
+SEARCHING-standardDeviation: 0.7
+SEARCHING-processNoiseQ: <[2x2]=
+[0.36    0],
+[   0 0.49]
+SEARCHING-rsme: <[4x_]:
+[0.0612645,
+0.0849679,
+0.330054,
+0.213075]
+SEARCHING-standardDeviation: 0.8
+SEARCHING-processNoiseQ: <[2x2]=
+[0.36    0],
+[   0 0.64]
+SEARCHING-rsme: <[4x_]:
+[0.0610295,
+0.0852075,
+0.331,
+0.214751]
 
-1. Clone this repo.
-2. Make a build directory: `mkdir build && cd build`
-3. Compile: `cmake .. && make`
-4. Run it: `./UnscentedKF` Previous versions use i/o from text files.  The current state uses i/o
-from the simulator.
+...
+```
 
-## Editor Settings
+After iterating back and forth several times, 0.6 was selected for both.
 
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
+#### Video Implementation
 
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
+[Data Set 1 Video](https://s3.amazonaws.com/autohandle.com/video/UKF_DataSet_1.mp4)
 
-## Code Style
+[Data Set 2 Video](https://s3.amazonaws.com/autohandle.com/video/UKF_DataSet_2.mp4)
 
-Please stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html) as much as possible.
-
-## Generating Additional Data
-
-This is optional!
-
-If you'd like to generate your own radar and lidar data, see the
-[utilities repo](https://github.com/udacity/CarND-Mercedes-SF-Utilities) for
-Matlab scripts that can generate additional data.
-
-## Project Instructions and Rubric
-
-This information is only accessible by people who are already enrolled in Term 2
-of CarND. If you are enrolled, see [the project page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/c3eb3583-17b2-4d83-abf7-d852ae1b9fff/concepts/f437b8b0-f2d8-43b0-9662-72ac4e4029c1)
-for instructions and the project rubric.
-
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
-
+The video was created by using a [screen recording tool](http://www.idownloadblog.com/2016/02/26/how-to-record-part-of-mac-screen-quicktime/).
