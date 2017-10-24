@@ -200,8 +200,8 @@ void Tools::testGenerateSigmaPoints() {
   
   KalmanState kalmanState = KalmanState(x,P);
   RadarFilter radarFiter = RadarFilter(n_aug, kalmanState,
-                                       UKF::newCovariance(n_z, std_radr, std_radphi, std_radrd)/*P*/,
-                                       UKF::newCovariance(n_aug-n_x, std_a_, std_yawdd_)/*Q*/);
+                                       UKF::newCovariance3(std_radr, std_radphi, std_radrd)/*P*/,
+                                       UKF::newCovariance2(std_a_, std_yawdd_)/*Q*/);
   assert(radarFiter.n_x()==n_x);
   assert(radarFiter.n_aug()==n_aug);
   
@@ -263,8 +263,8 @@ void Tools::testSigmaPointPrediction() {
   
   KalmanState kalmanState = KalmanState(n_x);
   RadarFilter radarFiter = RadarFilter(n_aug, kalmanState,
-                                       UKF::newCovariance(n_z, std_radr, std_radphi, std_radrd)/*P*/,
-                                       UKF::newCovariance(n_aug-n_x, std_a, std_yawdd)/*Q*/);
+                                       UKF::newCovariance3(std_radr, std_radphi, std_radrd)/*P*/,
+                                       UKF::newCovariance2(std_a, std_yawdd)/*Q*/);
   assert(radarFiter.n_x()==n_x);
   assert(radarFiter.n_aug()==n_aug);
   
@@ -336,8 +336,8 @@ void Tools::testAugmentedSigmaPoints() {
   
   //KalmanState kalmanState = KalmanState(n_x);
   RadarFilter radarFiter = RadarFilter(n_aug, kalmanState,
-                                       UKF::newCovariance(n_z, std_radr, std_radphi, std_radrd)/*P*/,
-                                       UKF::newCovariance(n_aug-n_x, std_a, std_yawdd)/*Q*/);
+                                       UKF::newCovariance3(std_radr, std_radphi, std_radrd)/*P*/,
+                                       UKF::newCovariance2(std_a, std_yawdd)/*Q*/);
   assert(radarFiter.n_x()==n_x);
   assert(radarFiter.n_aug()==n_aug);
   
@@ -408,8 +408,8 @@ void Tools::testPredictZMeasurement() {
   
   KalmanState kalmanState = KalmanState(n_x);
   RadarFilter radarFiter = RadarFilter(n_aug, kalmanState,
-                                       UKF::newCovariance(n_z, std_radr, std_radphi, std_radrd)/*P*/,
-                                       UKF::newCovariance(n_z, std_a, std_yawdd)/*Q*/);
+                                       UKF::newCovariance3(std_radr, std_radphi, std_radrd)/*P*/,
+                                       UKF::newCovariance2(std_a, std_yawdd)/*Q*/);
   
   //VectorXd z_out = VectorXd(3);
   //MatrixXd S_out = MatrixXd(3, 3);
@@ -473,8 +473,8 @@ void Tools::testPredictMeanAndCovariance() {
   
   KalmanState kalmanState = KalmanState(n_x);
   RadarFilter radarFilter = RadarFilter(n_aug, kalmanState,
-                                        UKF::newCovariance(n_z, std_radr, std_radphi, std_radrd)/*P*/,
-                                        UKF::newCovariance(n_z, std_a, std_yawdd)/*Q*/);
+                                        UKF::newCovariance3(std_radr, std_radphi, std_radrd)/*P*/,
+                                        UKF::newCovariance2(std_a, std_yawdd)/*Q*/);
   assert(radarFilter.n_x()==n_x);
   assert(radarFilter.n_aug()==n_aug);
   
@@ -573,8 +573,8 @@ void Tools::testUpdateState() {
   
   //KalmanState kalmanState = KalmanState(n_x);
   RadarFilter radarFiter = RadarFilter(n_aug, kalmanState,
-                                       UKF::newCovariance(n_z, std_radr, std_radphi, std_radrd)/*P*/,
-                                       UKF::newCovariance(n_aug-n_x, std_a, std_yawdd)/*Q*/);
+                                       UKF::newCovariance3(std_radr, std_radphi, std_radrd)/*P*/,
+                                       UKF::newCovariance2(std_a, std_yawdd)/*Q*/);
   assert(radarFiter.n_x()==n_x);
   assert(radarFiter.n_aug()==n_aug);
   
@@ -681,8 +681,8 @@ void Tools::testPrediction() {
   
   //KalmanState kalmanState = KalmanState(n_x);
   RadarFilter radarFilter = RadarFilter(n_aug, kalmanState,
-                                        UKF::newCovariance(n_z, std_radr, std_radphi, std_radrd)/*P*/,
-                                        UKF::newCovariance(n_aug-n_x, std_a, std_yawdd)/*Q*/);
+                                        UKF::newCovariance3(std_radr, std_radphi, std_radrd)/*P*/,
+                                        UKF::newCovariance2(std_a, std_yawdd)/*Q*/);
   assert(radarFilter.n_x()==n_x);
   assert(radarFilter.n_aug()==n_aug);
   
@@ -754,8 +754,8 @@ void Tools::testUpdate() {
   double std_radrd = 0.1;
   
   RadarFilter radarFiter = RadarFilter(n_aug, kalmanState,
-                                       UKF::newCovariance(n_z, std_radr, std_radphi, std_radrd)/*P*/,
-                                       UKF::newCovariance(n_z, std_a, std_yawdd)/*Q*/);
+                                       UKF::newCovariance3(std_radr, std_radphi, std_radrd)/*P*/,
+                                       UKF::newCovariance2(std_a, std_yawdd)/*Q*/);
   
   //create example matrix with predicted sigma points
   MatrixXd Xsig_pred = MatrixXd(n_x, 2 * n_aug + 1);

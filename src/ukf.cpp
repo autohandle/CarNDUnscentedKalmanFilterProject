@@ -217,6 +217,7 @@ std::string UKF::toString() {
   return oss.str();
 }
 
+/*
 Eigen::MatrixXd UKF::newCovariance(int numberOfSigmas, ...) {
   
   va_list listOfSigmas;
@@ -232,6 +233,29 @@ Eigen::MatrixXd UKF::newCovariance(int numberOfSigmas, ...) {
   }
   return R;
 }
+*/
+
+Eigen::MatrixXd UKF::newCovariance(const int numberOfSigmas, const double sigmas[]) {
+  
+  Eigen::MatrixXd R = Eigen::MatrixXd(numberOfSigmas, numberOfSigmas);
+  R.setZero();
+  
+  for ( int rowcol = 0; rowcol < numberOfSigmas; rowcol++ ){
+    R(rowcol,rowcol)=sigmas[rowcol]*sigmas[rowcol];
+  }
+  return R;
+}
+
+Eigen::MatrixXd UKF::newCovariance3(const double sigma1, const double sigma2, const double sigma3) {
+  double sigmas[]= {sigma1, sigma2, sigma3};
+  return newCovariance(3, sigmas);
+}
+
+Eigen::MatrixXd UKF::newCovariance2(const double sigma1, const double sigma2) {
+  double sigmas[]= {sigma1, sigma2};
+  return newCovariance(2, sigmas);
+}
+
 
 VectorXd UKF::calculateWeights(const int lambda, const int n_aug) {
   assert (lambda>-10 && lambda < 10);
@@ -451,7 +475,9 @@ KalmanState UKF::predictMeanAndCovariance(const MatrixXd& xSigPredicted) {
   
   //*x_out=x;
   //*P_out=P;
-  return KalmanState::KalmanState(x, P);
+  //return KalmanState::KalmanState(x, P);
+  KalmanState newKalmanState(x,P);
+  return newKalmanState;
 }
 
 MatrixXd UKF::transformSigmaPointsToMeasurements(const MatrixXd& xSigPredicted) {
@@ -634,7 +660,8 @@ double UKF::updateState(const Eigen::MatrixXd& Zsig, const Eigen::MatrixXd& z_pr
   //write result
   //*x_out = newX;
   //*P_out = newP;
-  KalmanState newKalmanState = KalmanState::KalmanState(newX, newP);
+  //KalmanState newKalmanState = KalmanState::KalmanState(newX, newP);
+  KalmanState newKalmanState(newX, newP);
   updateKalmanState(newKalmanState);
   return nis;
 }
@@ -830,8 +857,10 @@ void UKFProcessor::initialize(const MeasurementPackage& theMeasurementPackage,
     
     assert(theKalmanState.n_x()>0);
     
-    KalmanState newKalmanState=
-    KalmanState::KalmanState(theInitialState, theKalmanState.P());
+    //KalmanState newKalmanState=
+    //KalmanState::KalmanState(theInitialState, theKalmanState.P());
+    KalmanState newKalmanState(theInitialState, theKalmanState.P());
+
     theKalmanState.update(newKalmanState);
     is_initialized_ = true;
     if (Tools::TESTING) {

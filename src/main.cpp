@@ -234,7 +234,7 @@ int main(int argc, char *argv[])
   // Process noise standard deviation yaw acceleration in rad/s^2
   const double std_yawdd_ = 0.6;//0.8;//0.6;
   
-  MatrixXd processNoiseQ = UKF::newCovariance(2, std_a_, std_yawdd_);
+  MatrixXd processNoiseQ = UKF::newCovariance2(std_a_, std_yawdd_);
 
 
   // Laser measurement noise standard deviation position1 in m
@@ -252,8 +252,8 @@ int main(int argc, char *argv[])
   // Radar measurement noise standard deviation radius change in m/s
   const double std_radrd_ = 0.3;
   
-  MatrixXd radarR = UKF::newCovariance(3,std_radr_, std_radphi_, std_radrd_);
-  MatrixXd lidarR = UKF::newCovariance(2, std_laspx_, std_laspy_);
+  MatrixXd radarR = UKF::newCovariance3(std_radr_, std_radphi_, std_radrd_);
+  MatrixXd lidarR = UKF::newCovariance2(std_laspx_, std_laspy_);
 
   // Create a Kalman Filter instance
   KalmanState kalmanState = KalmanState(5);
@@ -288,7 +288,7 @@ int main(int argc, char *argv[])
     for (int standardDeviation=1; standardDeviation<10; standardDeviation++) {
       estimations.clear();
       ground_truth.clear();
-      MatrixXd processNoiseQ = UKF::newCovariance(2, standardDeviation*0.1, 0.6);
+      MatrixXd processNoiseQ = UKF::newCovariance2(standardDeviation*0.1, 0.6);
       KalmanState kalmanState = KalmanState(5);
       cout <<"SEARCHING-standardDeviation: "<< standardDeviation*0.1 << "\n";
       cout <<"SEARCHING-processNoiseQ: <"<< Tools::toString(processNoiseQ) << "\n";

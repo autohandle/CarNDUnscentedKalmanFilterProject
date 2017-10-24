@@ -180,7 +180,11 @@ public:
   void UpdateRadar(const MeasurementPackage& meas_package);
   
   std::string toString();
-  static Eigen::MatrixXd newCovariance(int numberOfArguments, ...);
+  //static Eigen::MatrixXd newCovariance(int numberOfArguments, ...);
+  static Eigen::MatrixXd newCovariance(const int numberOfSigmas, const double sigmas[]);
+  static Eigen::MatrixXd newCovariance2(const double sigma1, const double sigma2);
+  static Eigen::MatrixXd newCovariance3(const double sigma1, const double sigma2, const double sigma3);
+
   
   const VectorXd& x() {
     return kalmanState.x();
